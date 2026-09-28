@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>故障报告自动生成系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2c7be5',
+                        secondary: '#4096ff',
+                        accent: '#165dff',
+                        neutral: '#f5f7fa',
+                        'neutral-dark': '#e5e6eb',
+                        success: '#00b42a',
+                        warning: '#ff7d00',
+                        danger: '#f53f3f',
+                        dark: '#1d2129'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ===== 顶部导航栏 ===== */
+        .top-menu {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            height: 60px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .menu-logo {
+            font-size: 22px;
+            font-weight: bold;
+            color: #2c7be5;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .menu-logo img {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            animation: logoPulse 3s ease-in-out infinite;
+        }
+        @keyframes logoPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(44, 123, 229, 0.3); }
+            50% { box-shadow: 0 0 0 8px rgba(44, 123, 229, 0); }
+        }
+        .menu-items { display: flex; gap: 1px; }
+        .menu-item { position: relative; cursor: pointer; }
+        .menu-item > a {
+            text-decoration: none;
+            color: #666;
+            font-size: 14px;
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .menu-item > a:hover, .menu-item > a.active {
+            color: #2c7be5;
+            background-color: #f0f6ff;
+        }
+
+        /* ===== 卡片动效 ===== */
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(44, 123, 229, 0.12);
+        }
+
+        /* ===== 进度条 ===== */
+        .progress-bar {
+            height: 4px;
+            background: linear-gradient(90deg, #2c7be5 0%, #4096ff 100%);
+            transition: width 0.5s ease;
+            border-radius: 2px;
+        }
+
+        /* ===== 文件上传区 ===== */
+        .upload-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-zone:hover, .upload-zone.drag-over {
+            border-color: #2c7be5;
+            background-color: #f0f6ff;
+        }
+
+        /* ===== 表格 ===== */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            background-color: #f8f9fa;
+            color: #666;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 2px solid #e5e6eb;
+        }
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        .data-table tr:hover td {
+            background-color: #fafafa;
+        }
+
+        /* ===== 动画 ===== */
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .pulse-dot {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ===== 步骤指示器 ===== */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+        .step-dot {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .step-dot.done { background: #00b42a; color: white; }
+        .step-dot.active { background: #2c7be5; color: white; }
+        .step-dot.pending { background: #e5e6eb; color: #999; }
+        .step-line {
+            width: 40px; height: 2px;
+            transition: background 0.3s ease;
+        }
+        .step-line.done { background: #00b42a; }
+        .step-line.pending { background: #e5e6eb; }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 768px) {
+            .top-menu { padding: 0 15px; }
+            .menu-items { display: none; }
+        }
+    </style>
+</head>
+<body class="font-inter bg-neutral min-h-screen">
+
+    <!-- ==================== 顶部导航栏 ==================== -->
+    <div class="top-menu">
+        <div class="menu-logo">
+            <img src="logo.png" alt="logo"> 故障报告自动生成
+        </div>
+        <div class="menu-items">
+            <div class="menu-item">
+                <a href="#" class="active" onclick="switchTab('generate')">
+                    <i class="fa fa-file-text-o mr-2"></i>报告生成
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="#" onclick="switchTab('files')">
+                    <i class="fa fa-folder-open-o mr-2"></i>文件管理
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="#" onclick="switchTab('reports')">
+                    <i class="fa fa-history mr-2"></i>历史报告
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 主内容区 ==================== -->
+    <div class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- ===== Tab 1: 报告生成 ===== -->
+        <div id="tab-generate" class="fade-in">
+            <!-- 页面标题 -->
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-dark mb-2">
+                    <i class="fa fa-cogs mr-2" style="color:#2c7be5;"></i>故障报告自动生成
+                </h1>
+                <p class="text-gray-500">上传故障相关文件，AI自动分析并生成专业的故障事件分析报告</p>
+            </div>
+
+            <!-- 使用步骤 -->
+            <div class="bg-white rounded-xl p-6 mb-6 card-shadow">
+                <h3 class="text-base font-semibold text-dark mb-4">
+                    <i class="fa fa-info-circle mr-2" style="color:#2c7be5;"></i>使用流程
+                </h3>
+                <div class="step-indicator flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <div class="step-dot active">1</div>
+                        <span class="text-sm text-gray-600">上传文件</span>
+                    </div>
+                    <div class="step-line pending mx-2"></div>
+                    <div class="flex items-center gap-2">
+                        <div class="step-dot pending">2</div>
+                        <span class="text-sm text-gray-600">确认信息</span>
+                    </div>
+                    <div class="step-line pending mx-2"></div>
+                    <div class="flex items-center gap-2">
+                        <div class="step-dot pending">3</div>
+                        <span class="text-sm text-gray-600">AI生成报告</span>
+                    </div>
+                    <div class="step-line pending mx-2"></div>
+                    <div class="flex items-center gap-2">
+                        <div class="step-dot pending">4</div>
+                        <span class="text-sm text-gray-600">下载报告</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 智能生成（单文档） -->
+            <div class="bg-white rounded-xl p-6 card-shadow mb-6">
+                <h3 class="text-base font-semibold text-dark mb-2">
+                    <i class="fa fa-bolt mr-2" style="color:#2c7be5;"></i>智能生成（推荐）
+                </h3>
+                <p class="text-sm text-gray-500 mb-4">请上传故障相关数据文件，系统将自动分析并生成报告。支持格式：TXT / DOCX / CSV / JSON / Excel。</p>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <input type="file" id="smartFileInput" accept=".txt,.docx,.csv,.json,.xlsx,.xls" class="hidden" onchange="onSmartFileSelect(event)">
+                    <button onclick="document.getElementById('smartFileInput').click()"
+                            class="px-4 py-2.5 rounded-lg text-white font-medium text-sm"
+                            style="background: linear-gradient(135deg, #2c7be5 0%, #4096ff 100%);">
+                        <i class="fa fa-cloud-upload mr-2"></i>选择故障文档
+                    </button>
+                    <span id="smartFileName" class="text-sm text-gray-500">未选择文件</span>
+                    <button onclick="smartGenerate()" id="smartGenerateBtn"
+                            class="px-8 py-2.5 rounded-lg text-white font-semibold text-sm hover:opacity-90"
+                            style="background: linear-gradient(135deg, #00b42a 0%, #2c7be5 100%);">
+                        <i class="fa fa-play mr-2"></i>智能生成报告
+                    </button>
+                </div>
+            </div>
+
+            <!-- 手动分类上传（可选） -->
+            <details class="bg-white rounded-xl card-shadow mb-6">
+                <summary class="cursor-pointer p-6 text-base font-semibold text-dark select-none hover:bg-gray-50">
+                    <i class="fa fa-cloud-upload mr-2" style="color:#2c7be5;"></i>手动分类上传（可选）
+                </summary>
+                <div class="px-6 pb-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- 文件上传卡片 -->
+                        <div class="bg-white rounded-xl p-6 border border-neutral-dark">
+                            <h3 class="text-base font-semibold text-dark mb-4">
+                                <i class="fa fa-cloud-upload mr-2" style="color:#2c7be5;"></i>上传文件
+                            </h3>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">文件分类</label>
+                                <select id="uploadCategory" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition">
+                                    <option value="事件简述">事件简述</option>
+                                    <option value="事件前运行方式">事件前运行方式</option>
+                                    <option value="事件后运行方式">事件后运行方式</option>
+                                    <option value="故障一次设备信息及维护情况">故障一次设备信息及维护情况</option>
+                                    <option value="故障二次设备信息及维护情况">故障二次设备信息及维护情况</option>
+                                    <option value="二次设备分析">二次设备分析</option>
+                                </select>
+                            </div>
+
+                            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                                <i class="fa fa-cloud-upload text-4xl text-gray-300 mb-3 block"></i>
+                                <p class="text-gray-500 text-sm">点击上传或拖拽文件到此处</p>
+                                <p class="text-gray-400 text-xs mt-1">支持 TXT, DOCX, CSV, JSON, XLSX, PDF, PNG, JPG 格式</p>
+                            </div>
+                            <input type="file" id="fileInput" class="hidden" onchange="handleFileSelect(event)" multiple>
+
+                            <!-- 已选文件列表 -->
+                            <div id="selectedFiles" class="mt-4 space-y-2"></div>
+
+                            <button onclick="uploadAllFiles()" id="uploadBtn"
+                                    class="mt-4 w-full py-2.5 rounded-lg text-white font-medium text-sm transition-all"
+                                    style="background: linear-gradient(135deg, #2c7be5 0%, #4096ff 100%);">
+                                <i class="fa fa-upload mr-2"></i>上传全部文件
+                            </button>
+
+                            <div id="uploadStatus" class="mt-3 text-sm"></div>
+                        </div>
+
+                        <!-- 已上传文件清单 -->
+                        <div class="bg-white rounded-xl p-6 border border-neutral-dark">
+                            <h3 class="text-base font-semibold text-dark mb-4">
+                                <i class="fa fa-list-ul mr-2" style="color:#2c7be5;"></i>已上传文件清单
+                            </h3>
+                            <div id="fileList" class="max-h-64 overflow-y-auto">
+                                <p class="text-gray-400 text-sm text-center py-8">点击刷新按钮加载文件列表</p>
+                            </div>
+                            <button onclick="refreshFileList()" class="mt-3 text-sm text-gray-500 hover:text-blue-500 transition">
+                                <i class="fa fa-refresh mr-1"></i>刷新列表
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 生成按钮 & 进度 -->
+            <div class="bg-white rounded-xl p-6 card-shadow mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-semibold text-dark">
+                        <i class="fa fa-magic mr-2" style="color:#2c7be5;"></i>开始生成报告
+                    </h3>
+                    <button onclick="startGenerate()" id="generateBtn"
+                            class="px-8 py-2.5 rounded-lg text-white font-semibold text-sm transition-all hover:opacity-90"
+                            style="background: linear-gradient(135deg, #2c7be5 0%, #4096ff 100%);">
+                        <i class="fa fa-play mr-2"></i>开始生成
+                    </button>
+                </div>
+
+                <!-- 进度条 -->
+                <div id="progressSection" class="hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="progressLabel" class="text-sm text-gray-600">准备中...</span>
+                        <span id="progressPercent" class="text-sm font-semibold" style="color:#2c7be5;">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-2">
+                        <div class="progress-bar rounded-full h-2" id="progressBar" style="width: 0%;"></div>
+                    </div>
+                    <p id="progressMessage" class="text-xs text-gray-400 mt-2"></p>
+                </div>
+
+                <!-- 结果 -->
+                <div id="generateResult" class="hidden mt-4"></div>
+            </div>
+        </div>
+
+        <!-- ===== Tab 2: 文件管理 ===== -->
+        <div id="tab-files" class="hidden fade-in">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-dark mb-2">
+                    <i class="fa fa-folder-open-o mr-2" style="color:#2c7be5;"></i>文件管理
+                </h1>
+                <p class="text-gray-500">管理已上传的故障数据文件，按分类查看</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div id="fileManagerContent">
+                    <p class="text-gray-400 text-center py-8">加载中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Tab 3: 历史报告 ===== -->
+        <div id="tab-reports" class="hidden fade-in">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-dark mb-2">
+                    <i class="fa fa-history mr-2" style="color:#2c7be5;"></i>历史报告
+                </h1>
+                <p class="text-gray-500">查看和下载已生成的故障分析报告</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 card-shadow">
+                <div id="reportsContent">
+                    <p class="text-gray-400 text-center py-8">加载中...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- ==================== JavaScript ==================== -->
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let selectedFiles = [];
+
+        // ===== Tab 切换 =====
+        function switchTab(tab) {
+            document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+
+            document.querySelectorAll('.menu-item > a').forEach(a => a.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (tab === 'files') loadFileManager();
+            if (tab === 'reports') loadReports();
+        }
+
+        // ===== 文件选择 =====
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            selectedFiles = [...selectedFiles, ...files];
+            renderSelectedFiles();
+            event.target.value = '';
+        }
+
+        function renderSelectedFiles() {
+            const container = document.getElementById('selectedFiles');
+            container.innerHTML = selectedFiles.map((f, i) => `
+                <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                    <span class="text-gray-700"><i class="fa fa-file-text-o mr-2 text-gray-400"></i>${f.name}</span>
+                    <button onclick="removeFile(${i})" class="text-gray-400 hover:text-blue-500">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderSelectedFiles();
+        }
+
+        // ===== 上传文件 =====
+        async function uploadAllFiles() {
+            if (selectedFiles.length === 0) {
+                alert('请先选择文件');
+                return;
+            }
+
+            const category = document.getElementById('uploadCategory').value;
+            const statusDiv = document.getElementById('uploadStatus');
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.textContent = '上传中...';
+
+            let success = 0, fail = 0;
+            for (const file of selectedFiles) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('category', category);
+
+                try {
+                    const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
+                    if (res.ok) { success++; } else { fail++; }
+                } catch (e) {
+                    fail++;
+                }
+            }
+
+            statusDiv.innerHTML = `<span class="text-green-600"><i class="fa fa-check-circle mr-1"></i>上传完成：成功 ${success} 个，失败 ${fail} 个</span>`;
+            selectedFiles = [];
+            renderSelectedFiles();
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-upload mr-2"></i>上传全部文件';
+            refreshFileList();
+        }
+
+        // ===== 刷新文件列表 =====
+        async function refreshFileList() {
+            const container = document.getElementById('fileList');
+            try {
+                const res = await fetch(`${API_BASE}/api/files`);
+                const data = await res.json();
+
+                if (Object.keys(data).length === 0) {
+                    container.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">暂无已上传文件</p>';
+                    return;
+                }
+
+                container.innerHTML = Object.entries(data).map(([category, files]) => `
+                    <div class="mb-3">
+                        <div class="text-xs font-semibold text-gray-500 mb-1">
+                            <i class="fa fa-folder mr-1"></i>${category}
+                        </div>
+                        ${files.map(f => `
+                            <div class="flex items-center justify-between text-sm py-1 pl-4">
+                                <span class="text-gray-700"><i class="fa fa-file-text-o mr-2 text-gray-300"></i>${f.name}</span>
+                                <span class="flex items-center gap-3">
+                                    <span class="text-gray-400 text-xs">${formatSize(f.size)}</span>
+                                    <button onclick="deleteFile('${category}', '${f.name}')" class="text-gray-400 hover:text-red-500" title="删除"><i class="fa fa-trash"></i></button>
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<p class="text-red-400 text-sm text-center py-8">加载失败，请确保后端服务已启动</p>';
+            }
+        }
+
+        // ===== 智能生成（单文档） =====
+        let smartSelectedFile = null;
+
+        function onSmartFileSelect(event) {
+            const file = event.target.files[0];
+            smartSelectedFile = file;
+            document.getElementById('smartFileName').textContent = file ? file.name : '未选择文件';
+            event.target.value = '';
+        }
+
+        async function smartGenerate() {
+            if (!smartSelectedFile) {
+                alert('请先选择故障文档');
+                return;
+            }
+            const btn = document.getElementById('smartGenerateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>解析生成中...';
+
+            const progressSection = document.getElementById('progressSection');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressLabel = document.getElementById('progressLabel');
+            const progressMessage = document.getElementById('progressMessage');
+            const resultDiv = document.getElementById('generateResult');
+
+            progressSection.classList.remove('hidden');
+            resultDiv.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressLabel.textContent = '正在解析文档...';
+            progressMessage.textContent = 'AI 正在读取文档并提取故障信息';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', smartSelectedFile);
+                const res = await fetch(`${API_BASE}/api/generate-single`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || '智能生成请求失败');
+                }
+                const taskId = data.task_id;
+                const poll = setInterval(async () => {
+                    const taskRes = await fetch(`${API_BASE}/api/task/${taskId}`);
+                    const task = await taskRes.json();
+                    progressBar.style.width = task.progress + '%';
+                    progressPercent.textContent = task.progress + '%';
+                    progressLabel.textContent = task.status === 'processing' ? '正在生成...' : task.status;
+                    progressMessage.textContent = task.message || '';
+                    if (task.status === 'completed') {
+                        clearInterval(poll);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa fa-play mr-2"></i>智能生成报告';
+                        resultDiv.classList.remove('hidden');
+                        resultDiv.innerHTML = `
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa fa-check-circle text-green-500 text-2xl"></i>
+                                    <div>
+                                        <p class="text-green-800 font-semibold">报告生成成功！</p>
+                                        <p class="text-green-600 text-sm">报告编号：${task.report_id}</p>
+                                    </div>
+                                    <a href="${API_BASE}/api/download/${task.report_file}"
+                                       class="ml-auto px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition">
+                                        <i class="fa fa-download mr-1"></i>下载报告
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (task.status === 'failed') {
+                        clearInterval(poll);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa fa-play mr-2"></i>智能生成报告';
+                        progressLabel.textContent = '生成失败';
+                        resultDiv.classList.remove('hidden');
+                        resultDiv.innerHTML = `
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                <p class="text-red-600"><i class="fa fa-exclamation-circle mr-2"></i>${task.error || '未知错误'}</p>
+                            </div>
+                        `;
+                    }
+                }, 1000);
+            } catch (e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-play mr-2"></i>智能生成报告';
+                progressLabel.textContent = '请求失败';
+                progressMessage.textContent = e.message || '请确保后端服务已启动';
+                resultDiv.classList.remove('hidden');
+                resultDiv.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p class="text-red-600"><i class="fa fa-exclamation-circle mr-2"></i>${e.message || '请求失败'}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // ===== 删除文件 / 报告 =====
+        async function deleteFile(category, filename) {
+            if (!confirm('确定删除文件「' + filename + '」吗？')) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/files/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category: category, filename: filename })
+                });
+                const data = await res.json();
+                if (res.ok) { refreshFileList(); loadFileManager(); }
+                else { alert(data.error || '删除失败'); }
+            } catch (e) {
+                alert('删除失败，请确认后端已启动');
+            }
+        }
+
+        async function deleteReport(filename) {
+            if (!confirm('确定删除报告「' + filename + '」吗？')) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/reports/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await res.json();
+                if (res.ok) { loadReports(); }
+                else { alert(data.error || '删除失败'); }
+            } catch (e) {
+                alert('删除失败，请确认后端已启动');
+            }
+        }
+
+        // ===== 开始生成报告 =====
+        async function startGenerate() {
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>生成中...';
+
+            const progressSection = document.getElementById('progressSection');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressLabel = document.getElementById('progressLabel');
+            const progressMessage = document.getElementById('progressMessage');
+            const resultDiv = document.getElementById('generateResult');
+
+            progressSection.classList.remove('hidden');
+            resultDiv.classList.add('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/generate`, { method: 'POST' });
+                const { task_id } = await res.json();
+
+                // 轮询任务状态
+                const poll = setInterval(async () => {
+                    const taskRes = await fetch(`${API_BASE}/api/task/${task_id}`);
+                    const task = await taskRes.json();
+
+                    progressBar.style.width = task.progress + '%';
+                    progressPercent.textContent = task.progress + '%';
+                    progressLabel.textContent = task.status === 'processing' ? '正在生成...' : task.status;
+                    progressMessage.textContent = task.message || '';
+
+                    if (task.status === 'completed') {
+                        clearInterval(poll);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa fa-play mr-2"></i>开始生成';
+
+                        resultDiv.classList.remove('hidden');
+                        resultDiv.innerHTML = `
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa fa-check-circle text-green-500 text-2xl"></i>
+                                    <div>
+                                        <p class="text-green-800 font-semibold">报告生成成功！</p>
+                                        <p class="text-green-600 text-sm">报告编号：${task.report_id}</p>
+                                    </div>
+                                    <a href="${API_BASE}/api/download/${task.report_file}"
+                                       class="ml-auto px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition">
+                                        <i class="fa fa-download mr-1"></i>下载报告
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    if (task.status === 'failed') {
+                        clearInterval(poll);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa fa-play mr-2"></i>开始生成';
+                        progressLabel.textContent = '生成失败';
+
+                        resultDiv.classList.remove('hidden');
+                        resultDiv.innerHTML = `
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                <p class="text-red-600"><i class="fa fa-exclamation-circle mr-2"></i>${task.error || '未知错误'}</p>
+                            </div>
+                        `;
+                    }
+                }, 1000);
+
+            } catch (e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-play mr-2"></i>开始生成';
+                progressLabel.textContent = '请求失败';
+                progressMessage.textContent = '请确保后端服务已启动';
+            }
+        }
+
+        // ===== 文件管理器 =====
+        async function loadFileManager() {
+            const container = document.getElementById('fileManagerContent');
+            try {
+                const res = await fetch(`${API_BASE}/api/files`);
+                const data = await res.json();
+
+                if (Object.keys(data).length === 0) {
+                    container.innerHTML = '<p class="text-gray-400 text-center py-8">暂无已上传文件</p>';
+                    return;
+                }
+
+                container.innerHTML = Object.entries(data).map(([category, files]) => `
+                    <div class="mb-6">
+                        <h4 class="text-base font-semibold text-dark mb-3">
+                            <i class="fa fa-folder-open-o mr-2" style="color:#2c7be5;"></i>${category}
+                            <span class="text-gray-400 text-sm font-normal ml-2">(${files.length} 个文件)</span>
+                        </h4>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>文件名</th>
+                                    <th>大小</th>
+                                    <th>修改时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${files.map(f => `
+                                    <tr>
+                                        <td><i class="fa fa-file-text-o mr-2 text-gray-400"></i>${f.name}</td>
+                                        <td>${formatSize(f.size)}</td>
+                                        <td>${new Date(f.modified).toLocaleString('zh-CN')}</td>
+                                        <td>
+                                            <a href="${API_BASE}/api/files/download?category=${encodeURIComponent(category)}&filename=${encodeURIComponent(f.name)}" class="text-blue-500 hover:text-blue-700 text-sm mr-3"><i class="fa fa-download mr-1"></i>下载</a>
+                                            <button onclick="deleteFile('${category}', '${f.name}')" class="text-red-500 hover:text-red-700 text-sm"><i class="fa fa-trash mr-1"></i>删除</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<p class="text-red-400 text-center py-8">加载失败，请确保后端服务已启动</p>';
+            }
+        }
+
+        // ===== 历史报告 =====
+        async function loadReports() {
+            const container = document.getElementById('reportsContent');
+            try {
+                const res = await fetch(`${API_BASE}/api/reports`);
+                const reports = await res.json();
+
+                if (reports.length === 0) {
+                    container.innerHTML = '<p class="text-gray-400 text-center py-8">暂无已生成报告</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>报告名称</th>
+                                <th>类型</th>
+                                <th>大小</th>
+                                <th>生成时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reports.map(r => `
+                                <tr>
+                                    <td><i class="fa fa-file-word-o mr-2" style="color:#2c7be5;"></i>${r.name}</td>
+                                    <td><span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">${r.type.toUpperCase()}</span></td>
+                                    <td>${formatSize(r.size)}</td>
+                                    <td>${new Date(r.modified).toLocaleString('zh-CN')}</td>
+                                    <td>
+                                        <a href="${API_BASE}/api/download/${r.name}"
+                                           class="text-blue-500 hover:text-blue-700 text-sm mr-3">
+                                            <i class="fa fa-download mr-1"></i>下载
+                                        </a>
+                                        <button onclick="deleteReport('${r.name}')" class="text-red-500 hover:text-red-700 text-sm">
+                                            <i class="fa fa-trash mr-1"></i>删除
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (e) {
+                container.innerHTML = '<p class="text-red-400 text-center py-8">加载失败，请确保后端服务已启动</p>';
+            }
+        }
+
+        // ===== 工具函数 =====
+        function formatSize(bytes) {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+            return bytes.toFixed(1) + ' ' + units[i];
+        }
+
+        // ===== 拖拽上传 =====
+        const uploadZone = document.getElementById('uploadZone');
+        if (uploadZone) {
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('drag-over');
+            });
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('drag-over');
+            });
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('drag-over');
+                const files = Array.from(e.dataTransfer.files);
+                selectedFiles = [...selectedFiles, ...files];
+                renderSelectedFiles();
+            });
+        }
+
+        // ===== 初始化 =====
+        refreshFileList();
+    </script>
+</body>
+</html>
