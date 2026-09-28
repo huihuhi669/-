@@ -113,11 +113,4 @@ openpyxl
 
 本项目仅用于学习交流。商业场景使用，请自行完成智谱大模型 API 授权。
 
-## Git 上传前准备
 
-1. 使用.gitignore 忽略运行时自动生成的 uploads、generated_reports、python 缓存文件，不要上传用户业务数据；
-2. 删除代码内硬编码的真实 API 密钥。
-
----
-
-如果你想要，我可以把上面全部内容转为 markdown 文本，你复制到 Word 后可以一键导出 docx；或者我把`.gitignore`的文字一并给你。
